@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 from app.db.models import ConversationDB, MessageDB
 from app.models.conversation import Message, Conversation
+from sqlalchemy import select
 
 
 class ConversationRepository:
@@ -22,7 +23,8 @@ class ConversationRepository:
         for message in conversation_db.messages:
             messages.append(self._to_message(message))
         conversation: Conversation = Conversation(
-            id=conversation_db.id, messages=messages
+            id=conversation_db.id, messages=messages,
+            last_memory_message_id=conversation_db.last_memory_message_id,
         )
         return conversation
 
@@ -45,3 +47,26 @@ class ConversationRepository:
         self.session.add(message_db)
         self.session.flush()
         return self._to_message(message_db)
+
+    def get_messages_after(
+        self,
+        conversation_id: int,
+        message_id: int | None,
+    ):
+        stmt = select(MessageDB).where(
+            MessageDB.conversation_id == conversation_id,
+            MessageDB.role == "user",
+        )
+
+        if message_id is not None:
+            stmt = stmt.where(MessageDB.id > message_id)
+
+        stmt = stmt.order_by(MessageDB.id)
+
+        return list(self.session.scalars(stmt).all())
+
+    def update_memory_checkpoint(self, conversation_id: int, message_id: int) -> None:
+        conversation = self.session.get(ConversationDB, conversation_id)
+        if conversation is None:
+            raise ValueError(f"Conversation {conversation_id} not found")
+        conversation.last_memory_message_id = message_id

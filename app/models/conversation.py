@@ -13,4 +13,5 @@ class Message:
 class Conversation:
     id : int
     messages : list[Message]
+    last_memory_message_id: int | None = None
 

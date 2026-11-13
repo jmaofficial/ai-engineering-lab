@@ -1,3 +1,15 @@
+Chattgränssnitt
+==============
+
+Starta tjänsten med `.venv/bin/uvicorn app.main:app --reload` och öppna
+[http://127.0.0.1:8000/](http://127.0.0.1:8000/). Ingen separat frontend-server
+eller installation av JavaScript-paket behövs. Vyn använder samma `/agent`-API
+och stödjer Markdown-tabeller, kodblock, ny chatt och pågående-anrop-indikering.
+Enter skickar, Shift+Enter ger en ny rad. Den aktuella konversationen sparas i
+webbläsarens localStorage (de senaste 200 meddelandena). New chat återställer
+vyn; tidigare konversationer finns fortfarande i PostgreSQL. Sidan återställer
+utkastet vid fel och skickar inte om anrop automatiskt.
+
 Agentens minneshämtning
 ======================
 
@@ -5,6 +17,11 @@ Agenten kan använda `search_memories(query)` när uppgiften kräver mer kontext
 Sökningen matchar ord i aktiva minnen, sorterar efter importance och sedan ID.
 Tom sökfråga bläddrar bland alla aktiva minnen. Upprepade anrop hämtar nya
 resultat inom samma användartur. Detta är ordmatchning, inte semantisk sökning.
+Om en ny sökfråga saknar ordträffar returneras i stället en tydligt märkt sida
+med andra sparade minnen (`retrieval_mode=browse_fallback`). Det hjälper vid
+olika ordval utan domänspecifika synonymer. Dessa resultat är inte påstått
+semantiskt relevanta och följer samma sid- och budgetgränser. Upprepade anrop
+med samma fråga fortsätter bland dessa minnen utan dubbletter.
 
 Följande miljövariabler kan anges i `.env` (starta om tjänsten efter ändring):
 
@@ -136,3 +153,17 @@ inom agentens anropsbudget. Kontodata lagras lokalt för denna privata app;
 åtkomstkontroll per användare behövs innan tjänsten delas med andra.
 Matplotlib finns i containern, men figurfiler exporteras ännu inte till chatten.
 Full tokenbudget, matchtimeline-hämtning och fri Bash är separata framtida steg.
+
+Agentbeteende
+=============
+
+De generella instruktionerna finns i `app/agents/instructions.py`. Agenten väljer
+själv om och vilka verktyg som behövs; ingen LoL- eller statistikarbetsgång krävs
+av systemprompten. Domänspecifika funktioner och metodstöd beskrivs i respektive
+verktyg. Ett motiverat beslut under osäkerhet skiljs från ett statistiskt bevis.
+Granskaren bedömer om svaret besvarar användarens fråga och stämmer med tillgänglig
+evidens, utan att kräva vissa verktyg eller ett fast svarsformat.
+
+Integrationstestet kräver inte en viss verktygsföljd. Lägg till `--require-python`
+när du uttryckligen vill testa att agenten kör Python; lämna bort flaggan när
+du testar fritt verktygsval eller ett direkt svar.

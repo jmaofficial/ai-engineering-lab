@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="dark">
+    <meta name="description" content="A simple chat with your AI engineering lab agent.">
+    <title>Lab — Chat</title>
+    <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="/static/chat.css">
+    <script type="module" src="/static/chat.js"></script>
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="Lab home"><span class="brand-mark" aria-hidden="true">✳</span> Lab <span class="brand-label">Your AI workspace</span></a>
+      <button id="new-chat" class="new-chat" type="button"><span aria-hidden="true">＋</span> New chat</button>
+    </header>
+
+    <main id="main">
+      <section id="welcome" class="welcome" aria-labelledby="welcome-title">
+        <div class="welcome-mark" aria-hidden="true">✳</div>
+        <p class="eyebrow">A little curiosity goes a long way</p>
+        <h1 id="welcome-title">What are we exploring today?</h1>
+        <p class="welcome-description">Ask a question, work through an idea, or take a closer look at your game.</p>
+        <div class="suggestions" aria-label="Try a question">
+          <button type="button" class="suggestion" data-prompt="Help me analyze my champion pool for ranked mid. Ask me for the account details you need."><span aria-hidden="true">↗</span><strong>Find my champion pool</strong><span>Explore what my match history says</span></button>
+          <button type="button" class="suggestion" data-prompt="Explain confidence intervals with a practical example from League of Legends."><span aria-hidden="true">⌘</span><strong>Make it make sense</strong><span>Understand a concept with an example</span></button>
+        </div>
+      </section>
+
+      <section id="messages" class="messages" aria-label="Conversation" aria-live="polite" aria-relevant="additions" hidden></section>
+
+      <div class="composer-dock">
+        <div id="status" class="status" role="status" aria-live="polite"></div>
+        <div id="error" class="error" role="alert" hidden></div>
+        <form id="chat-form" class="composer">
+          <label class="sr-only" for="message">Message the agent</label>
+          <textarea id="message" name="message" rows="1" placeholder="Ask anything…" maxlength="30000" required></textarea>
+          <div class="composer-footer"><span class="composer-hint">Enter to send <span aria-hidden="true">·</span> Shift + Enter for a new line</span><button id="send" class="send" type="submit" aria-label="Send message" disabled><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 19V5m-6 6 6-6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div>
+        </form>
+        <p class="footnote">An AI perspective. Check important details.</p>
+      </div>
+    </main>
+  </body>
+</html>

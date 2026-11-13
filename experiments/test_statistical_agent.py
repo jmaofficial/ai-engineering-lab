@@ -16,6 +16,7 @@ def main():
     parser.add_argument('--region', default='europe')
     parser.add_argument('--url', default='http://127.0.0.1:8000/agent')
     parser.add_argument('--prompt', help='Optional user request, including desired response language')
+    parser.add_argument('--require-python', action='store_true', help='Check Python execution explicitly when testing that capability')
     args = parser.parse_args()
     started = time.time()
     message = args.prompt or (
@@ -39,11 +40,12 @@ def main():
     assert len(traces) == 1, 'No unique execution trace matches the response'
     path, trace = traces[0]
     analyses = [x for x in trace['tools'] if x['name'] == 'analyze_match_dataset']
-    assert analyses, 'Agent never executed Python analysis'
-    assert analyses[-1]['result'].get('success'), 'Last Python analysis was incomplete'
-    assert trace.get('reviews') and trace['reviews'][-1]['approved'], 'Answer failed evidence review'
-    assert any(x['name'] == 'inspect_match_dataset' for x in trace['tools']), 'Dataset coverage was never inspected'
-    print('PASS: HTTP response, dataset inspection, successful Python and approved evidence review')
+    if args.require_python:
+        assert analyses, 'The explicitly tested Python capability was not used'
+        assert analyses[-1]['result'].get('success'), 'Last Python analysis was incomplete'
+    if trace['tools']:
+        assert trace.get('reviews') and trace['reviews'][-1]['approved'], 'Answer failed evidence review'
+    print('PASS: HTTP response and execution trace; tool selection was left to the agent')
     print('Conversation:', result['conversation_id'])
     print('Trace:', path)
     print('Tools:', ', '.join(x['name'] for x in trace['tools']))

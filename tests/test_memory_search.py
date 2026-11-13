@@ -46,12 +46,32 @@ class MemorySearchTests(unittest.TestCase):
 
     def test_budgets_and_no_match(self):
         tool = MemorySearch(self.repository, AgentSettings(memory_max_items=1))
-        self.assertEqual(tool.search_memories("absent")["status"], "query_exhausted")
-        self.assertEqual(len(tool.search_memories("")["memories"]), 1)
+        result = tool.search_memories("absent")
+        self.assertEqual(result["retrieval_mode"], "browse_fallback")
+        self.assertEqual(len(result["memories"]), 1)
         self.assertEqual(tool.search_memories("")["status"], "budget_exhausted")
         tool = MemorySearch(self.repository, AgentSettings(memory_max_chars=2))
         self.assertEqual(tool.search_memories("")["status"], "budget_exhausted")
         self.assertEqual(tool.used_chars, 0)
+
+    def test_nonmatching_vocabulary_can_recover_existing_fact(self):
+        self.repository.add_memory('fact', 'User travels by bicycle.', 1.0)
+        tool = MemorySearch(self.repository, AgentSettings(memory_page_size=1))
+        result = tool.search_memories('commute')
+        self.assertEqual(result['retrieval_mode'], 'browse_fallback')
+        self.assertEqual(result['memories'][0]['content'], 'User travels by bicycle.')
+        self.assertTrue(result['has_more'])
+        next_page = tool.search_memories('commute')
+        self.assertNotEqual(next_page['memories'][0]['id'], result['memories'][0]['id'])
+        self.assertEqual(next_page['retrieval_mode'], 'browse_fallback')
+
+    def test_empty_store_does_not_invent_fallback_memories(self):
+        with Session(create_engine('sqlite://')) as session:
+            Base.metadata.create_all(session.bind)
+            tool = MemorySearch(MemoryRepository(session), AgentSettings())
+            result = tool.search_memories('commute')
+            self.assertEqual(result['memories'], [])
+            self.assertFalse(result['has_more'])
 
     def test_agent_calls_tool_then_asks_user_on_final_iteration(self):
         llm = Mock()
@@ -62,12 +82,13 @@ class MemorySearchTests(unittest.TestCase):
             SimpleNamespace(function_calls=None, text="Vilken databas använder du?",
                             candidates=[SimpleNamespace(content=types.Content(role="model", parts=[
                                 types.Part.from_text(text="Vilken databas använder du?")]))]),
+            SimpleNamespace(parsed=AnalysisReview(approved=True, feedback='Focused question with honest missing context')),
         ]
         service = AgentService(llm, ToolRegistry(), ConversationRepository(self.session),
-                               self.session, Mock(), self.repository, max_iterations=2)
+                               self.session, Mock(), self.repository, max_iterations=3)
         answer, _ = service.run("Hjälp mig med databasen")
         self.assertEqual(answer, "Vilken databas använder du?")
-        final_call = llm.client.models.generate_content.call_args
+        final_call = llm.client.models.generate_content.call_args_list[1]
         self.assertIsNone(final_call.kwargs["config"].tools)
         self.assertIn("query_exhausted", str(final_call.kwargs["contents"]))
 
@@ -110,6 +131,33 @@ class MemorySearchTests(unittest.TestCase):
         self.assertFalse(review.approved)
         self.assertIn(code, llm.client.models.generate_content.call_args.kwargs['contents'])
         self.assertEqual(service.calls_remaining, 2)
+
+    def test_direct_response_needs_no_tool_or_review(self):
+        llm = Mock()
+        text = 'Börja med ett minimalt exempel så att du kan isolera felet.'
+        llm.client.models.generate_content.return_value = SimpleNamespace(
+            function_calls=None, text=text, candidates=[SimpleNamespace(content=
+                types.Content(role='model', parts=[types.Part.from_text(text=text)]))])
+        service = AgentService(llm, ToolRegistry(), ConversationRepository(self.session),
+                               self.session, Mock(), self.repository)
+        answer, _ = service.run('Hur börjar jag isolera ett fel?')
+        self.assertEqual(answer, text)
+        self.assertEqual(service.tool_trace, [])
+        llm.client.models.generate_content.assert_called_once()
+
+    def test_review_handles_general_tools_and_original_user_goal(self):
+        llm = Mock()
+        llm.client.models.generate_content.return_value = SimpleNamespace(
+            parsed=AnalysisReview(approved=True, feedback='Matches the requested calculation'))
+        service = AgentService(llm, ToolRegistry(), ConversationRepository(self.session),
+                               self.session, Mock(), self.repository)
+        service.calls_remaining = 3
+        service.user_request = 'Vad blir 4 plus 3?'
+        service.tool_trace = [{'name': 'calculate', 'args': {'operation': 'add', 'a': 4, 'b': 3}, 'result': 7.0}]
+        self.assertTrue(service._review_analysis_answer('7').approved)
+        contents = llm.client.models.generate_content.call_args.kwargs['contents']
+        self.assertIn(service.user_request, contents)
+        self.assertIn('7.0', contents)
 
 
 if __name__ == "__main__":

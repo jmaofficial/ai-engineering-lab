@@ -73,7 +73,7 @@ class AgentService:
         )
 
         for i in range(self.max_iterations):
-            response = self._generate_response(history)
+            response = self._generate_response(history[-10:])
 
             if not response.function_calls:
                 history.append(response.candidates[0].content)
